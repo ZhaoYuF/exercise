@@ -224,13 +224,13 @@ const createPieces = () => {
     }
 }
 
-const chessList = Array.from({ length: height }, () =>
-    Array.from({ length: rows }, () => Array.from({ length: cols }, () => false))
+const chessList = Array.from({ length: cols }, () =>
+    Array.from({ length: height }, () => Array.from({ length: rows }, () => false))
 );
-chessList[0][5][5] = true;
-chessList[0][5][4] = true;
-chessList[0][4][1] = true;
-chessList[0][4][2] = true;
+chessList[5][0][5] = true;
+chessList[5][0][4] = true;
+chessList[4][0][5] = true;
+chessList[4][0][4] = true;
 
 const copyPieces = (pieces) => {
     const newPieces = { ...pieces }
@@ -248,7 +248,7 @@ const cubePositionsWithPieces = (pieces) => {
 
 const isValidPieces = (pieces, list) => {
     const positions = cubePositionsWithPieces(pieces)
-    for (const [x, y, z] in positions) {
+    for (let [x, y, z] of positions) {
         if (x < 0 || y < 0 || z < 0 || x >= cols || z >= rows) {
             return false
         }
@@ -278,8 +278,10 @@ const downPieces = (pieces, list) => {
     const newPieces = copyPieces(pieces)
     newPieces.position[1] -= 1
     if (isValidPieces(newPieces, list)) {
+        console.log("下");
         return newPieces
     } else {
+        console.log("停");
         return pieces
     }
 }
@@ -289,5 +291,5 @@ export {
     chessList,
     createPieces,
     cubePositionsWithPieces,
-    turnChess,
+    turnChess, downPieces,
 }
