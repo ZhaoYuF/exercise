@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
-import { extend } from "@react-three/fiber";
+import { extend, useFrame } from "@react-three/fiber";
 import * as THREE from 'three';
 import { DoubleSide } from 'three';
-import { rows, cols, height, chessList, currentChess, cubePositionsWithPieces, turnChess } from './Pieces.js'
+import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess } from './Pieces.js'
+import Bomb from './Bomb.jsx';
 
 
 const CustomShaderMaterial = new shaderMaterial(
@@ -40,28 +41,51 @@ extend({ CustomShaderMaterial });
 
 export default function Tetris() {
 
-    const [cubeList, setCubeList] = useState(chessList);
+    const [gameData, _] = useState({
+        state: 0, // 0暂停，1运行下落，2下落结束，
+        runDuration: 0.0, //
+        runSpeed: 1.0, //
+        currentStep: 0,
+        currentPieces: createPieces()
+    }) 
 
-    const [currentCube, setCurrentCube] = useState(currentChess);
+    const [cubeList, setCubeList] = useState(chessList);
+    const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
+
+    const [currentCubeTime, setCurrentCubeTime] = useState(0);
+
+    const downCurrentCube = useCallback(() => {
+        gameData.currentPieces.position[1] -= 1
+        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+    }, [])
+ 
+    const turnCurrentPieces = useCallback((turnType) => {
+        gameData.currentPieces = turnChess(turnType, gameData.currentPieces, cubeList)
+        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+    }, [])
 
     const handleKeyDown = (event) => {
-        console.log("aaa");
-        switch (event.key) {
-            case 'ArrowUp':
+        // console.log(event.keyCode);
+        switch (event.keyCode) {
+            case 38:
                 // 处理向上键的逻辑
-                setCurrentCube(turnChess(0, currentCube, cubeList))
+                turnCurrentPieces(0)
                 break;
-            case 'ArrowDown':
+            case 40:
                 // 处理向下键的逻辑
-                setCurrentCube(turnChess(1, currentCube, cubeList))
+                turnCurrentPieces(1)
                 break;
-            case 'ArrowLeft':
+            case 37:
                 // 处理向左键的逻辑
-                setCurrentCube(turnChess(2, currentCube, cubeList))
+                turnCurrentPieces(2)
                 break;
-            case 'ArrowRight':
+            case 39:
                 // 处理向右键的逻辑
-                setCurrentCube(turnChess(3, currentCube, cubeList))
+                turnCurrentPieces(3)
+                break;
+            case 32:
+                //空格
+                downCurrentCube()
                 break;
             default:
                 // 其他按键的处理逻辑
@@ -76,9 +100,20 @@ export default function Tetris() {
         };
     }, [currentCube])
 
+    useFrame((state, delta) => {
+        // console.log(delta);
+        if(gameData.state == 1) {
+            gameData.runDuration += delta * gameData.runSpeed
+            if(gameData.runDuration >= gameData.currentStep + 1) {
+                gameData.currentStep += 1
+                downCurrentCube()
+            }
+        }
+    })
+
     return (
         <>
-            <group position={[0, -4, 0]} rotation-y={Math.PI * 0} rotation-x={0.15}>
+            <group position={[0, -height * 0.5, 0]} rotation-y={Math.PI * 0} rotation-x={0.15}>
                 <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
                     {
                         cubeList.map((floor, y) => {
@@ -96,7 +131,7 @@ export default function Tetris() {
                         }).flat().flat().filter(item => item !== undefined)
                     }
                     {
-                        cubePositionsWithPieces(currentCube).map(p => {
+                        currentCube.map(p => {
                             return (
                                 <RoundedBox key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
                                     <meshNormalMaterial />
@@ -112,10 +147,34 @@ export default function Tetris() {
                     <Box args={[cols, 0.2, rows]} >
                         <customShaderMaterial uCols={cols} uRows={rows} />
                     </Box>
-                    <Plane args={[cols, rows]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
-                        <meshStandardMaterial color="#ff0ff0" side={DoubleSide} />
+                    <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
+                        <meshBasicMaterial color="#f00000" side={DoubleSide} transparent opacity={0.2} />
+                    </Plane>
+                    <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
+                        <meshBasicMaterial color="#00f000" side={DoubleSide} transparent opacity={0.2} />
+                    </Plane>
+                    <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>
+                        <meshBasicMaterial color="#ffffff" side={DoubleSide} transparent opacity={0.1} />
+                    </Plane>
+                    <Plane args={[rows, height + 0.3]} position-y={height * 0.5} position-x={-cols * 0.51} rotation-y={Math.PI * 0.5}>
+                        <meshBasicMaterial color="#0000f0" side={DoubleSide} transparent opacity={0.2} />
+                    </Plane>
+                    <Plane args={[rows, height + 0.3]} position-y={height * 0.5} position-x={cols * 0.51} rotation-y={Math.PI * 0.5}>
+                        <meshBasicMaterial color="#00f0f0" side={DoubleSide} transparent opacity={0.1} />
                     </Plane>
                 </group>
+                {/* <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
+                    <Bomb position={[0, 0, 8]} color="#00ff00" />
+                    <Bomb position={[1, 0, 8]} color="#00ff00" />
+                    <Bomb position={[2, 0, 8]} color="#00ff00" />
+                    <Bomb position={[3, 0, 8]} color="#00ff00" />
+                    <Bomb position={[4, 0, 8]} color="#00ff00" />
+                    <Bomb position={[5, 0, 8]} color="#00ff00" />
+                    <Bomb position={[6, 0, 8]} color="#00ff00" />
+                    <Bomb position={[7, 0, 8]} color="#00ff00" />
+                    <Bomb position={[8, 0, 8]} color="#00ff00" />
+                    <Bomb position={[9, 0, 8]} color="#00ff00" />
+                </group> */}
             </group>
         </>
     )

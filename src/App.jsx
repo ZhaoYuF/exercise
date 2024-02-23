@@ -1,5 +1,4 @@
 // import { useState } from 'react'
-
 import { Canvas } from "@react-three/fiber"
 import Experience from "./Experience"
 import Tetris from "./tetris/Tetris"
@@ -21,10 +20,11 @@ function App() {
           // outputColorSpace: THREE.LinearSRGBColorSpace
         }}
         camera={{
-          position: [0, 0, 12]
+          position: [0, 0, 20]
         }}
-        // style={{ background: '#ffffff' }}
+      // style={{ background: '#ffffff' }}
       >
+        {/* <Sky sunPosition={[-10, 50, 10]} /> */}
         <OrbitControls />
         {/* <orbitControls args={[camera, gl.domElement]} /> */}
         <directionalLight position={[0, 20, 0]} intensity={2} castShadow />
