@@ -3,7 +3,7 @@ import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
 import { extend, useFrame } from "@react-three/fiber";
 import * as THREE from 'three';
 import { DoubleSide } from 'three';
-import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces } from './Pieces.js'
+import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess } from './Pieces.js'
 import Bomb from './Bomb.jsx';
 
 
@@ -33,29 +33,92 @@ const CustomShaderMaterial = new shaderMaterial(
         if(y > 0.5) {
             x = 1.0 - step(0.5, x);
         }
-        gl_FragColor = vec4(x, x, x, 1.0);
+        if(x < 0.5) {
+            gl_FragColor = vec4(0.12, 0.12, 0.165, 1.0);
+        } else {
+            gl_FragColor = vec4(0.973, 0.925, 0.855, 1.0);
+        }
       }
     `
 );
 extend({ CustomShaderMaterial });
 
+const PiecesDownSpeed = {
+    normal: 2.0,
+    quicker: 8.0,
+    fastest: 16.0,
+}
+
 export default function Tetris() {
 
     const [gameData, _] = useState({
-        state: 1, // 0暂停，1运行下落，2下落结束，
+        state: 1
+        , // 0暂停，1运行下落，2下落结束，
         runDuration: 0.0, //
-        runSpeed: 1.0, //
+        runSpeed: PiecesDownSpeed.normal, //
         currentStep: 0,
-        currentPieces: createPieces()
+        currentPieces: createPieces(),
+        nextPiece: undefined,
+        // canChangePiece: true,
     })
 
     const [cubeList, setCubeList] = useState(chessList);
     const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
+    const [nextCube, setNextCube] = useState(undefined);
 
     const [currentCubeTime, setCurrentCubeTime] = useState(0);
 
+    const createNextCube = useCallback(() => {
+        gameData.nextPiece = createPieces()
+        setNextCube(cubePositionsWithPieces(gameData.nextPiece))
+    }, []);
+
     const downCurrentCube = useCallback(() => {
         const pieces = downPieces(gameData.currentPieces, cubeList)
+        if (pieces != gameData.currentPieces) {
+            gameData.currentPieces = pieces
+            setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+            if (gameData.nextPiece == undefined && pieces.position[1] < height) {
+                createNextCube()
+            }
+        } else {
+            finishedCurrentCube()
+        }
+    }, [currentCube])
+
+    const cubeListAddCurrent = useCallback(() => {
+        if (currentCube) {
+            for (const [x, y, z] of currentCube.positions) {
+                cubeList[x][y][z] = {valid: true, color: currentCube.color}
+                if(y >= height) {
+                    gameData.state = 0
+                }
+            }
+        }
+    }, [currentCube])
+
+    const runNextCube = useCallback(() => {
+        gameData.runDuration = 0.0
+        gameData.currentStep = 0
+        gameData.currentPieces = gameData.nextPiece || createPieces()
+        gameData.nextPiece = undefined
+        gameData.runSpeed = PiecesDownSpeed.normal
+        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+        setNextCube(undefined)
+        if (gameData.state == 2) {
+            gameData.state = 1
+        }
+    }, []);
+
+    const finishedCurrentCube = useCallback(() => {
+        gameData.state = 2
+        cubeListAddCurrent()
+        setTimeout(() => {
+            runNextCube()
+        }, 100);
+    }, [currentCube])
+
+    const updateCurrentPieces = useCallback((pieces) => {
         if (pieces != gameData.currentPieces) {
             gameData.currentPieces = pieces
             setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
@@ -63,67 +126,52 @@ export default function Tetris() {
     }, [])
 
     const turnCurrentPieces = useCallback((turnType) => {
-        gameData.currentPieces = turnChess(turnType, gameData.currentPieces, cubeList)
-        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+        const pieces = turnChess(turnType, gameData.currentPieces, cubeList)
+        updateCurrentPieces(pieces)
     }, [])
 
-    // const eventData = useMemo(() => {
-    //     return {'38': {key: 0, action: 0}, '40': 1, '37': 2, '39': 3}
-    // }, [])
+    const moveCurrentPieces = useCallback((moveType) => {
+        const pieces = moveChess(moveType, gameData.currentPieces, cubeList)
+        updateCurrentPieces(pieces)
+    }, [])
+
+
     const handleKeyDown = (event) => {
-        console.log(event.keyCode);
-        switch (event.keyCode) {
-            case 38:
-                // 处理向上键的逻辑
-                turnCurrentPieces(0)
-                break;
-            case 40:
-                // 处理向下键的逻辑
-                turnCurrentPieces(1)
-                break;
-            case 37:
-                // 处理向左键的逻辑
-                turnCurrentPieces(2)
-                break;
-            case 39:
-                // 处理向右键的逻辑
-                turnCurrentPieces(3)
-                break;
-            case 87:
-                //上
-                downCurrentCube()
-                break;
-            case 83:
-                //下
-                downCurrentCube()
-                break;
-            case 65:
-                //左
-                downCurrentCube()
-                break;
-            case 68:
-                //右
-                downCurrentCube()
-                break;
-            case 32:
-                //空格
-                downCurrentCube()
-                break;
-            default:
-                // 其他按键的处理逻辑
-                break;
+        // console.log(event.keyCode);
+        if (gameData.state != 1) return
+        if (eventData[event.keyCode]) {
+            const { key, action } = eventData[event.keyCode]
+            if (action == 0) {
+                turnCurrentPieces(key)
+            } else if (action == 1) {
+                moveCurrentPieces(key)
+            } else if (action == 2) {
+                if (key == 0) {
+                    gameData.runSpeed = PiecesDownSpeed.quicker
+                } else if (key == 1) {
+                    gameData.runSpeed = PiecesDownSpeed.fastest
+                }
+            }
+        }
+    };
+
+    const handleKeyUp = (event) => {
+        if (gameData.state != 1) return
+        if (event.keyCode == 32) {
+            gameData.runSpeed = PiecesDownSpeed.normal
         }
     };
 
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
         };
-    }, [currentCube])
+    }, [])
 
     useFrame((state, delta) => {
-        // console.log(delta);
         if (gameData.state == 1) {
             gameData.runDuration += delta * gameData.runSpeed
             if (gameData.runDuration >= gameData.currentStep + 1) {
@@ -135,16 +183,16 @@ export default function Tetris() {
 
     return (
         <>
-            <group position={[0, -height * 0.5, 0]} rotation-y={Math.PI * 0} rotation-x={0.15}>
+            <group position={[0, -height * 0.5, 0]} rotation-y={Math.PI * 0} rotation-x={0}>
                 <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
                     {
                         cubeList.map((floor, x) => {
                             return floor.map((row, y) => {
                                 return row.map((item, z) => {
-                                    if (item) {
+                                    if (item && item.valid) {
                                         return (
-                                            <RoundedBox key={`${x}-${y}-${z}`} args={[1, 1, 1]} position={[x, y, z]} castShadow receiveShadow>
-                                                <meshStandardMaterial />
+                                            <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${x}-${y}-${z}`} args={[1, 1, 1]} position={[x, y, z]} receiveShadow>
+                                                <meshStandardMaterial color={item.color} />
                                             </RoundedBox>
                                         )
                                     }
@@ -153,13 +201,22 @@ export default function Tetris() {
                         }).flat().flat().filter(item => item !== undefined)
                     }
                     {
-                        currentCube.map(p => {
+                        currentCube ? currentCube.positions.map(p => {
                             return (
-                                <RoundedBox key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
-                                    <meshNormalMaterial />
+                                <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
+                                    <meshStandardMaterial color={currentCube.color} />
                                 </RoundedBox>
                             )
-                        })
+                        }) : null
+                    }
+                    {
+                        nextCube ? nextCube.positions.map(p => {
+                            return (
+                                <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p}>
+                                    <meshStandardMaterial color={nextCube.color} />
+                                </RoundedBox>
+                            )
+                        }) : null
                     }
                 </group>
                 <group>
@@ -169,10 +226,11 @@ export default function Tetris() {
                     <Box args={[cols, 0.2, rows]} >
                         <customShaderMaterial uCols={cols} uRows={rows} />
                     </Box>
+
                     <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
                         <meshBasicMaterial color="#f00000" side={DoubleSide} transparent opacity={0.2} />
                     </Plane>
-                    <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
+                    <Plane args={[cols+0.2, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
                         <meshBasicMaterial color="#00f000" side={DoubleSide} transparent opacity={0.2} />
                     </Plane>
                     <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>

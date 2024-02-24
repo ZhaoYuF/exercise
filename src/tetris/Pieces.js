@@ -45,7 +45,6 @@ const allCubeData = [
     [[0, 0, 0], [0, -1, 0], [-1, 0, 0], [1, 0, 0]], //35
     [[0, 0, 0], [0, 0, -1], [0, -1, 0], [0, 1, 0]], //36
     [[0, 0, 0], [0, 0, 1], [0, -1, 0], [0, 1, 0]], //37
-
     [[0, 0, 0], [0, 0, 1], [0, 0, -1], [-1, 0, 0]], //38
     [[0, 0, 0], [0, 0, 1], [0, 0, -1], [1, 0, 0]], //39
     [[0, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]], //40
@@ -60,7 +59,6 @@ const allCubeData = [
     [[0, 0, 0], [0, -1, 0], [-1, 0, 0], [-2, 0, 0]], //47
     [[0, 0, 0], [0, -1, 0], [0, 0, 1], [0, 0, 2]], //48
     [[0, 0, 0], [0, -1, 0], [0, 0, -1], [0, 0, -2]], //49
-
     [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 2, 0]], //50
     [[0, 0, 0], [1, 0, 0], [0, -1, 0], [0, -2, 0]], //51
     [[0, 0, 0], [1, 0, 0], [0, 0, 1], [0, 0, 2]], //52
@@ -69,7 +67,6 @@ const allCubeData = [
     [[0, 0, 0], [-1, 0, 0], [0, -1, 0], [0, -2, 0]], //55
     [[0, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, 2]], //56
     [[0, 0, 0], [-1, 0, 0], [0, 0, -1], [0, 0, -2]], //57
-
     [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 2, 0]], //58
     [[0, 0, 0], [0, 0, 1], [0, -1, 0], [0, -2, 0]], //59
     [[0, 0, 0], [0, 0, 1], [1, 0, 0], [2, 0, 0]], //60
@@ -89,7 +86,6 @@ const allCubeData = [
     [[0, 0, 0], [1, 0, 0], [0, -1, 0], [-1, -1, 0]], //71
     [[0, 0, 0], [1, 0, 0], [0, 0, -1], [-1, 0, -1]], //72
     [[0, 0, 0], [1, 0, 0], [0, 0, 1], [-1, 0, 1]], //73
-
     [[0, 0, 0], [0, 1, 0], [1, 0, 0], [1, -1, 0]], //74
     [[0, 0, 0], [0, 1, 0], [-1, 0, 0], [-1, -1, 0]], //75
     [[0, 0, 0], [0, 1, 0], [0, 0, 1], [0, -1, 1]], //76
@@ -98,7 +94,6 @@ const allCubeData = [
     [[0, 0, 0], [0, -1, 0], [-1, 0, 0], [-1, 1, 0]], //79
     [[0, 0, 0], [0, -1, 0], [0, 0, 1], [0, 1, 1]], //80
     [[0, 0, 0], [0, -1, 0], [0, 0, -1], [0, 1, -1]], //81
-
     [[0, 0, 0], [0, 0, 1], [1, 0, 0], [1, 0, -1]], //82
     [[0, 0, 0], [0, 0, 1], [-1, 0, 0], [-1, 0, -1]], //83
     [[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, -1]], //84
@@ -212,25 +207,52 @@ const rows = 10;
 const cols = 10;
 const height = 16;
 
+const eventData =  {
+    //action:0 变形，前、后、左、右
+    '38': {key: 0, action: 0}, 
+    '40': {key: 1, action: 0}, 
+    '37': {key: 2, action: 0},
+    '39': {key: 3, action: 0},
+    //action:1 移动，前、后、左、右
+    '87': {key: 0, action: 1},
+    '83': {key: 1, action: 1},
+    '65': {key: 2, action: 1},
+    '68': {key: 3, action: 1},
+    //action:2 倍速
+    '32': {key: 0, action: 2},
+    '13': {key: 1, action: 2}, //回车
+}
+
 // const currentChess = {
 //     position: [5, height, 5],
 //     type: 1
 // }
 
+const initTypesData= [
+    {type: 0, color: "#ff0000"}, //:.
+    {type: 12, color: "#00ff00"}, //::
+    {type: 24, color: "#0000ff"}, //....
+    {type: 30, color: "#f0f000"}, //.:.
+    {type: 42, color: "#f000f0"}, //:..
+    {type: 66, color: "#00f0f0"}, //.:•
+]
+
 const createPieces = () => {
+    const data =  initTypesData[Math.floor(Math.random() *  initTypesData.length)]
+    const position = [data.type == 24 ? 3 : 4, height + 2, 5]
     return {
-        position: [5, height, 5],
-        type: parseInt(Math.random() * 90)
+        ...data,
+        position
     }
 }
 
 const chessList = Array.from({ length: cols }, () =>
-    Array.from({ length: height }, () => Array.from({ length: rows }, () => false))
+    Array.from({ length: height + 2 }, () => Array.from({ length: rows }, () => undefined))
 );
-chessList[5][0][5] = true;
-chessList[5][0][4] = true;
-chessList[4][0][5] = true;
-chessList[4][0][4] = true;
+// chessList[5][0][5] = true;
+// chessList[5][0][4] = true;
+// chessList[4][0][5] = true;
+// chessList[4][0][4] = true;
 
 const copyPieces = (pieces) => {
     const newPieces = { ...pieces }
@@ -239,15 +261,18 @@ const copyPieces = (pieces) => {
 }
 
 const cubePositionsWithPieces = (pieces) => {
-    // console.log(pieces);
+    if(!pieces) {
+        return undefined
+    }
     const array = allCubeData[pieces.type]
     const position = pieces.position
-    return array.map(p => [p[0] + position[0], p[1] + position[1], p[2] + position[2]])
+    const positions = array.map(p => [p[0] + position[0], p[1] + position[1], p[2] + position[2]])
+    return { positions, color: pieces.color }
 }
 
 
 const isValidPieces = (pieces, list) => {
-    const positions = cubePositionsWithPieces(pieces)
+    const {positions} = cubePositionsWithPieces(pieces)
     for (let [x, y, z] of positions) {
         if (x < 0 || y < 0 || z < 0 || x >= cols || z >= rows) {
             return false
@@ -273,15 +298,31 @@ const turnChess = (trunType, pieces, list) => {
     }
 }
 
+const moveChess = (moveType, pieces, list) => {
+    const newPieces = copyPieces(pieces)
+    if(moveType == 0) {
+        newPieces.position[2] -= 1
+    } else if(moveType == 1) {
+        newPieces.position[2] += 1
+    } else if(moveType == 2) {
+        newPieces.position[0] -= 1
+    } else if(moveType == 3) {
+        newPieces.position[0] += 1
+    }
+    if (isValidPieces(newPieces, list)) {
+        return newPieces
+    } else {
+        return pieces
+    }
+}
+
 
 const downPieces = (pieces, list) => {
     const newPieces = copyPieces(pieces)
     newPieces.position[1] -= 1
     if (isValidPieces(newPieces, list)) {
-        console.log("下");
         return newPieces
     } else {
-        console.log("停");
         return pieces
     }
 }
@@ -289,7 +330,8 @@ const downPieces = (pieces, list) => {
 export {
     rows, cols, height,
     chessList,
+    eventData,
     createPieces,
     cubePositionsWithPieces,
-    turnChess, downPieces,
+    turnChess, downPieces, moveChess
 }
