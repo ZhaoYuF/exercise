@@ -27,7 +27,7 @@ function App() {
         {/* <Sky sunPosition={[-10, 50, 10]} /> */}
         <OrbitControls />
         <group rotation-x={0.15}>
-          <directionalLight position={[1, 8, 1]} intensity={1.8} castShadow />
+          <directionalLight position={[0, 20, 0]} intensity={1.8} castShadow />
           <directionalLight position={[5, 5, 10]} intensity={0.5} />
           <ambientLight intensity={0.8} />
           <Tetris />

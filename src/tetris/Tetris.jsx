@@ -3,7 +3,7 @@ import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
 import { extend, useFrame } from "@react-three/fiber";
 import * as THREE from 'three';
 import { DoubleSide } from 'three';
-import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess } from './Pieces.js'
+import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess, settlement } from './Pieces.js'
 import Bomb from './Bomb.jsx';
 
 
@@ -59,43 +59,68 @@ export default function Tetris() {
         currentStep: 0,
         currentPieces: createPieces(),
         nextPiece: undefined,
+        clearBombTimer: undefined,
         // canChangePiece: true,
     })
 
     const [cubeList, setCubeList] = useState(chessList);
+    const [bombList, setBombList] = useState([]);
     const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
-    const [nextCube, setNextCube] = useState(undefined);
+    const [nextCube, setNextCube] = useState({ positions: [], color: undefined });
 
-    const [currentCubeTime, setCurrentCubeTime] = useState(0);
+    // const [currentCubeTime, setCurrentCubeTime] = useState(0);
+
+    const updateCurrentCube = useCallback((data) => {
+        console.log(data);
+        if (data) {
+            currentCube.positions = data.positions
+            currentCube.color = data.color
+        } else {
+            currentCube.positions = []
+            currentCube.color = undefined
+        }
+        setCurrentCube({ ...currentCube })
+    }, [])
+
+    const updateNextCube = useCallback((data) => {
+        if (data) {
+            nextCube.positions = data.positions
+            nextCube.color = data.color
+        } else {
+            nextCube.positions = []
+            nextCube.color = undefined
+        }
+        setNextCube({ ...nextCube })
+    }, [])
 
     const createNextCube = useCallback(() => {
         gameData.nextPiece = createPieces()
-        setNextCube(cubePositionsWithPieces(gameData.nextPiece))
+        updateNextCube(cubePositionsWithPieces(gameData.nextPiece))
     }, []);
 
     const downCurrentCube = useCallback(() => {
         const pieces = downPieces(gameData.currentPieces, cubeList)
         if (pieces != gameData.currentPieces) {
             gameData.currentPieces = pieces
-            setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+            updateCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
             if (gameData.nextPiece == undefined && pieces.position[1] < height) {
                 createNextCube()
             }
         } else {
             finishedCurrentCube()
         }
-    }, [currentCube])
+    }, [])
 
     const cubeListAddCurrent = useCallback(() => {
         if (currentCube) {
             for (const [x, y, z] of currentCube.positions) {
-                cubeList[x][y][z] = {valid: true, color: currentCube.color}
-                if(y >= height) {
+                cubeList[x][y][z] = { valid: true, color: currentCube.color }
+                if (y >= height) {
                     gameData.state = 0
                 }
             }
         }
-    }, [currentCube])
+    }, [])
 
     const runNextCube = useCallback(() => {
         gameData.runDuration = 0.0
@@ -103,8 +128,8 @@ export default function Tetris() {
         gameData.currentPieces = gameData.nextPiece || createPieces()
         gameData.nextPiece = undefined
         gameData.runSpeed = PiecesDownSpeed.normal
-        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
-        setNextCube(undefined)
+        updateCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+        updateNextCube()
         if (gameData.state == 2) {
             gameData.state = 1
         }
@@ -113,15 +138,32 @@ export default function Tetris() {
     const finishedCurrentCube = useCallback(() => {
         gameData.state = 2
         cubeListAddCurrent()
+        const { score, bombs } = settlement(currentCube.positions, cubeList)
+        console.log("得分", score);
+        if (score > 0) {
+            for (const { position } of bombs) {
+                const [x, y, z] = position
+                console.log(x, y, z);
+                cubeList[x][y][z] = undefined
+            }
+            setBombList(bombs)
+            if (gameData.clearBombTimer) {
+                clearTimeout(gameData.clearBombTimer)
+            }
+            gameData.clearBombTimer = setTimeout(() => {
+                setBombList([])
+                gameData.clearBombTimer = undefined
+            }, 1000);
+        }
         setTimeout(() => {
             runNextCube()
         }, 100);
-    }, [currentCube])
+    }, [])
 
     const updateCurrentPieces = useCallback((pieces) => {
         if (pieces != gameData.currentPieces) {
             gameData.currentPieces = pieces
-            setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+            updateCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
         }
     }, [])
 
@@ -201,22 +243,22 @@ export default function Tetris() {
                         }).flat().flat().filter(item => item !== undefined)
                     }
                     {
-                        currentCube ? currentCube.positions.map(p => {
+                        currentCube.positions.map(p => {
                             return (
                                 <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
                                     <meshStandardMaterial color={currentCube.color} />
                                 </RoundedBox>
                             )
-                        }) : null
+                        })
                     }
                     {
-                        nextCube ? nextCube.positions.map(p => {
+                        nextCube.positions.map(p => {
                             return (
                                 <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p}>
                                     <meshStandardMaterial color={nextCube.color} />
                                 </RoundedBox>
                             )
-                        }) : null
+                        })
                     }
                 </group>
                 <group>
@@ -230,7 +272,7 @@ export default function Tetris() {
                     <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
                         <meshBasicMaterial color="#f00000" side={DoubleSide} transparent opacity={0.2} />
                     </Plane>
-                    <Plane args={[cols+0.2, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
+                    <Plane args={[cols + 0.2, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
                         <meshBasicMaterial color="#00f000" side={DoubleSide} transparent opacity={0.2} />
                     </Plane>
                     <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>
@@ -243,8 +285,15 @@ export default function Tetris() {
                         <meshBasicMaterial color="#00f0f0" side={DoubleSide} transparent opacity={0.1} />
                     </Plane>
                 </group>
-                {/* <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
-                    <Bomb position={[0, 0, 8]} color="#00ff00" />
+                <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
+                    {
+                        bombList.map(({ position, color }) => {
+                            return <Bomb position={position} color={color} />
+                        }
+                        )
+                    }
+
+                    {/* <Bomb position={[0, 0, 8]} color="#00ff00" />
                     <Bomb position={[1, 0, 8]} color="#00ff00" />
                     <Bomb position={[2, 0, 8]} color="#00ff00" />
                     <Bomb position={[3, 0, 8]} color="#00ff00" />
@@ -253,8 +302,8 @@ export default function Tetris() {
                     <Bomb position={[6, 0, 8]} color="#00ff00" />
                     <Bomb position={[7, 0, 8]} color="#00ff00" />
                     <Bomb position={[8, 0, 8]} color="#00ff00" />
-                    <Bomb position={[9, 0, 8]} color="#00ff00" />
-                </group> */}
+                    <Bomb position={[9, 0, 8]} color="#00ff00" /> */}
+                </group>
             </group>
         </>
     )
