@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
 import { extend, useFrame } from "@react-three/fiber";
-import * as THREE from 'three';
 import { DoubleSide } from 'three';
-import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess, settlement } from './Pieces.js'
+import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess, settlement, moveDownCubeList } from './Pieces.js'
 import Bomb from './Bomb.jsx';
 
 
@@ -52,8 +51,8 @@ const PiecesDownSpeed = {
 export default function Tetris() {
 
     const [gameData, _] = useState({
-        state: 1
-        , // 0暂停，1运行下落，2下落结束，
+        running: false, // 是否运行
+        state: 1, //1下落， 2结算， 0游戏结束
         runDuration: 0.0, //
         runSpeed: PiecesDownSpeed.normal, //
         currentStep: 0,
@@ -64,6 +63,9 @@ export default function Tetris() {
     })
 
     const [cubeList, setCubeList] = useState(chessList);
+    const [settlementList, setSettlementList] = useState(Array.from({ length: height }, () =>
+    Array.from({ length: rows + cols }, () => 0))
+);
     const [bombList, setBombList] = useState([]);
     const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
     const [nextCube, setNextCube] = useState({ positions: [], color: undefined });
@@ -71,7 +73,7 @@ export default function Tetris() {
     // const [currentCubeTime, setCurrentCubeTime] = useState(0);
 
     const updateCurrentCube = useCallback((data) => {
-        console.log(data);
+        // console.log(data);
         if (data) {
             currentCube.positions = data.positions
             currentCube.color = data.color
@@ -117,8 +119,12 @@ export default function Tetris() {
                 cubeList[x][y][z] = { valid: true, color: currentCube.color }
                 if (y >= height) {
                     gameData.state = 0
+                } else {
+                    settlementList[y][x] += 1
+                    settlementList[y][cols + z] += 1
                 }
             }
+            updateCurrentCube()
         }
     }, [])
 
@@ -135,29 +141,49 @@ export default function Tetris() {
         }
     }, []);
 
+    //得分后，上面的往下移，然后重新结算
+    const moveCubeList = useCallback((bombs) => {
+        moveDownCubeList(bombs, cubeList, settlementList)
+        setCubeList([...cubeList])
+        setBombList([])
+        setTimeout(() => {
+            updateScoreAndCubeList()
+        }, 200);
+    }, [])
+
+    //结算分数，移除cube,添加爆炸
+    const updateScoreAndCubeList = useCallback(() => {
+        if(!gameData.running) return
+        const { count, bombs } = settlement(cubeList, settlementList)
+        // console.log("得分", score);
+        if (count > 0) {
+            // for (const { position } of bombs) {
+            //     const [x, y, z] = position
+            //     cubeList[x][y][z] = undefined
+            // }
+            if (gameData.clearBombTimer) {
+                gameData.clearBombTimer = undefined
+                clearTimeout(gameData.clearBombTimer)
+            }
+            
+            setBombList([...bombs])
+            setCubeList([...cubeList])
+            
+            gameData.clearBombTimer = setTimeout(() => {
+                gameData.clearBombTimer = undefined
+                moveCubeList(bombs) 
+            }, 800);
+        } else {
+            setTimeout(() => {
+                runNextCube()
+            }, 500);
+        }
+    }, []);
+
     const finishedCurrentCube = useCallback(() => {
         gameData.state = 2
         cubeListAddCurrent()
-        const { score, bombs } = settlement(currentCube.positions, cubeList)
-        console.log("得分", score);
-        if (score > 0) {
-            for (const { position } of bombs) {
-                const [x, y, z] = position
-                console.log(x, y, z);
-                cubeList[x][y][z] = undefined
-            }
-            setBombList(bombs)
-            if (gameData.clearBombTimer) {
-                clearTimeout(gameData.clearBombTimer)
-            }
-            gameData.clearBombTimer = setTimeout(() => {
-                setBombList([])
-                gameData.clearBombTimer = undefined
-            }, 1000);
-        }
-        setTimeout(() => {
-            runNextCube()
-        }, 100);
+        updateScoreAndCubeList()
     }, [])
 
     const updateCurrentPieces = useCallback((pieces) => {
@@ -180,41 +206,50 @@ export default function Tetris() {
 
     const handleKeyDown = (event) => {
         // console.log(event.keyCode);
-        if (gameData.state != 1) return
+        
         if (eventData[event.keyCode]) {
             const { key, action } = eventData[event.keyCode]
+            if (action == 3) {
+                if (gameData.running) {
+                    gameData.running = false
+                } else {
+                    gameData.running = true
+                    gameData.runSpeed = PiecesDownSpeed.normal
+                    if(gameData.state == 2) {
+                        updateScoreAndCubeList()
+                    }
+                }
+                return
+            }
+            if (gameData.state != 1 || !gameData.running) return
             if (action == 0) {
                 turnCurrentPieces(key)
             } else if (action == 1) {
                 moveCurrentPieces(key)
             } else if (action == 2) {
-                if (key == 0) {
-                    gameData.runSpeed = PiecesDownSpeed.quicker
-                } else if (key == 1) {
-                    gameData.runSpeed = PiecesDownSpeed.fastest
-                }
-            }
+                gameData.runSpeed = PiecesDownSpeed.fastest
+            } 
         }
     };
 
-    const handleKeyUp = (event) => {
-        if (gameData.state != 1) return
-        if (event.keyCode == 32) {
-            gameData.runSpeed = PiecesDownSpeed.normal
-        }
-    };
+    // const handleKeyUp = (event) => {
+    //     if (gameData.state != 1) return
+    //     if (event.keyCode == 32) {
+    //         gameData.runSpeed = PiecesDownSpeed.normal
+    //     }
+    // };
 
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
-        document.addEventListener('keyup', handleKeyUp);
+        // document.addEventListener('keyup', handleKeyUp);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            document.removeEventListener('keyup', handleKeyUp);
+            // document.removeEventListener('keyup', handleKeyUp);
         };
     }, [])
 
     useFrame((state, delta) => {
-        if (gameData.state == 1) {
+        if (gameData.state == 1 && gameData.running) {
             gameData.runDuration += delta * gameData.runSpeed
             if (gameData.runDuration >= gameData.currentStep + 1) {
                 gameData.currentStep += 1
@@ -288,10 +323,10 @@ export default function Tetris() {
                 <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
                     {
                         bombList.map(({ position, color }) => {
-                            return <Bomb position={position} color={color} />
+                            return <Bomb key={`${position[0]}-${position[1]}-${position[2]}`} position={position} color={color} />
                         }
                         )
-                    }
+                    } 
 
                     {/* <Bomb position={[0, 0, 8]} color="#00ff00" />
                     <Bomb position={[1, 0, 8]} color="#00ff00" />

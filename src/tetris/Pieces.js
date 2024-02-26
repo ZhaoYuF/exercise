@@ -219,8 +219,9 @@ const eventData = {
     '65': { key: 2, action: 1 },
     '68': { key: 3, action: 1 },
     //action:2 倍速
-    '32': { key: 0, action: 2 },
-    '13': { key: 1, action: 2 }, //回车
+    '13': { key: 0, action: 2 }, //回车
+    //空格暂停
+    '32': { key: 0, action: 3 },
 }
 
 // const currentChess = {
@@ -249,6 +250,7 @@ const createPieces = () => {
 const chessList = Array.from({ length: cols }, () =>
     Array.from({ length: height + 2 }, () => Array.from({ length: rows }, () => undefined))
 );
+
 // chessList[5][0][5] = true;
 // chessList[5][0][4] = true;
 // chessList[4][0][5] = true;
@@ -325,84 +327,73 @@ const downPieces = (pieces, list) => {
     }
 }
 
-const settlement = (positions, list) => {
-    let count = 0
-    let bombs = {}
-    let keys = {}
-    let key = ""
-    let isOK = true
-    for (const [x, y, z] of positions) {
-        key = `_${y}_${z}`
-        if (!keys[key]) {
-            for (let i = 0; i < cols; i++) {
-                if (!list[i][y][z]) {
-                    isOK = false
-                    break
-                }
+//爆炸后下移
+const moveDownCubeList = (bombs, cubeList, settlementList) => {
+    for (const {position} of bombs) {
+        const [x, y, z] = position
+        for (let h = y; h < height - 1; h++) {
+            const from = cubeList[x][h+1][z]
+            const to = cubeList[x][h][z]
+            if(!to && from) {
+                //从无到有
+                settlementList[h][x] += 1
+                settlementList[h][cols + z] += 1
+                // console.log(h, '层', x, '列', z, '行++');
+            } else if (to && !from) {
+                //从有到无
+                settlementList[h][x] -= 1
+                settlementList[h][cols + z] -= 1
+                // console.log(h, '层', x, '列', z, '行--');
             }
-            if (isOK) {
-                count += 1
-                keys[key] = true
-                for (let j = 0; j < cols; j++) {
-                    const k = `${j}_${y}_${z}`
-                    const position = [j, y, z]
-                    const color = list[j][y][z].color
-                    bombs[k] = {position, color}
-                }
-            } else {
-                isOK = true
-            }
+            cubeList[x][h][z] = from
         }
-        key = `${x}__${z}`
-        if (!keys[key]) {
-            for (let i = 0; i < height; i++) {
-                if (!list[x][i][z]) {
-                    isOK = false
-                    break
-                }
-            }
-            if (isOK) {
-                count += 1
-                keys[key] = true
-                for (let j = 0; j < height; j++) {
-                    const k = `${x}_${j}_${z}`
-                    const position = [x, j, z]
-                    const color = list[x][j][z].color
-                    bombs[k] = {position, color}
-                }
-            } else {
-                isOK = true
-            }
-        }
-        key = `${x}_${y}_`
-        if (!keys[key]) {
-            for (let i = 0; i < rows; i++) {
-                if (!list[x][y][i]) {
-                    isOK = false
-                    break
-                }
-            }
-            if (isOK) {
-                count += 1
-                keys[key] = true
-                for (let j = 0; j < height; j++) {
-                    const k = `${x}_${y}_${j}`
-                    const position = [x, y, j]
-                    const color = list[x][y][j].color
-                    bombs[k] = {position, color}
-                }
-            } else {
-                isOK = true
-            }
+        if(cubeList[x][height-1][z]) {
+            //
+            cubeList[x][height-1][z] = undefined
+            settlementList[height-1][x] -= 1
+            settlementList[height-1][cols + z] -= 1
         }
     }
-    let bombsArray = []
-    // for (const k in bombs) {
-    //     bombsArray.push(bombs[k])
-    // }
-    // console.log(bombs);
-    // console.log(bombs.values);
-    return { score: Math.pow(2, count) - 1, bombs: Object.values(bombs) }
+    // console.log(settlementList);
+}
+
+//结算，计算当前可得分的行和列，更新list(清空得分的，上面的向下移)
+//返回值，得分的行列数，得分的坐标
+const settlement = (cubeList, settlementList) => {
+    let count = 0
+    let bombs = []
+    for(let y = settlementList.length - 1; y >= 0; y--) {
+        let floorBombs = {}
+        for (let x = 0; x < cols; x++) {
+            if(settlementList[y][x] >= rows) {
+                //y层x列 得分
+                count++;
+                for (let z = 0; z < rows; z++) {
+                    const key = `${x}_${y}_${z}`
+                    floorBombs[key] = {position: [x, y, z], color: cubeList[x][y][z].color}
+                }
+            }
+        }
+        for (let z = 0; z < rows; z++) {
+            if(settlementList[y][cols + z] >= cols) {
+                //y层z行 得分
+                count++;
+                for (let x = 0; x < cols; x++) {
+                    const key = `${x}_${y}_${z}`
+                    floorBombs[key] = {position: [x, y, z], color: cubeList[x][y][z].color}
+                }
+            }
+        }
+        floorBombs = Object.values(floorBombs)
+        bombs = bombs.concat(floorBombs)
+    }
+    for (const {position} of bombs) {
+        const [x, y, z] = position
+        cubeList[x][y][z] = undefined
+        settlementList[y][x] -= 1
+        settlementList[y][cols + z] -= 1
+    }
+    return { count, bombs }
 }
 
 export {
@@ -412,5 +403,5 @@ export {
     createPieces,
     cubePositionsWithPieces,
     turnChess, downPieces, moveChess,
-    settlement
+    settlement, moveDownCubeList
 }
