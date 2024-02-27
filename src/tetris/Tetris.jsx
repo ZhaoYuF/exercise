@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
 import { extend, useFrame } from "@react-three/fiber";
 import { DoubleSide } from 'three';
@@ -33,7 +33,7 @@ const CustomShaderMaterial = new shaderMaterial(
             x = 1.0 - step(0.5, x);
         }
         if(x < 0.5) {
-            gl_FragColor = vec4(0.12, 0.12, 0.165, 1.0);
+            gl_FragColor = vec4(0.85, 0.78, 0.61, 1.0);
         } else {
             gl_FragColor = vec4(0.973, 0.925, 0.855, 1.0);
         }
@@ -44,7 +44,6 @@ extend({ CustomShaderMaterial });
 
 const PiecesDownSpeed = {
     normal: 2.0,
-    quicker: 8.0,
     fastest: 16.0,
 }
 
@@ -55,17 +54,27 @@ export default function Tetris() {
         state: 1, //1下落， 2结算， 0游戏结束
         runDuration: 0.0, //
         runSpeed: PiecesDownSpeed.normal, //
+        cubeIndex: 0,
         currentStep: 0,
         currentPieces: createPieces(),
         nextPiece: undefined,
         clearBombTimer: undefined,
+        directionData: [
+            [0, 1, 2, 3],
+            [2, 3, 1, 0],
+            [1, 0, 3, 2],
+            [3, 2, 0, 1]
+        ],
+        direction: 0, //0, 1, 2, 3: 前右后左
         // canChangePiece: true,
     })
 
+    const tetrisRef = useRef()
+
     const [cubeList, setCubeList] = useState(chessList);
     const [settlementList, setSettlementList] = useState(Array.from({ length: height }, () =>
-    Array.from({ length: rows + cols }, () => 0))
-);
+        Array.from({ length: rows + cols }, () => 0))
+    );
     const [bombList, setBombList] = useState([]);
     const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
     const [nextCube, setNextCube] = useState({ positions: [], color: undefined });
@@ -96,6 +105,7 @@ export default function Tetris() {
     }, [])
 
     const createNextCube = useCallback(() => {
+        gameData.cubeIndex += currentCube.positions.length
         gameData.nextPiece = createPieces()
         updateNextCube(cubePositionsWithPieces(gameData.nextPiece))
     }, []);
@@ -133,6 +143,11 @@ export default function Tetris() {
         gameData.currentStep = 0
         gameData.currentPieces = gameData.nextPiece || createPieces()
         gameData.nextPiece = undefined
+
+        console.log(gameData.cubeIndex);
+        if (PiecesDownSpeed.normal < PiecesDownSpeed.fastest) {
+            PiecesDownSpeed.normal = 2 + Math.floor(gameData.cubeIndex / 100) * 0.5
+        }
         gameData.runSpeed = PiecesDownSpeed.normal
         updateCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
         updateNextCube()
@@ -153,7 +168,7 @@ export default function Tetris() {
 
     //结算分数，移除cube,添加爆炸
     const updateScoreAndCubeList = useCallback(() => {
-        if(!gameData.running) return
+        if (!gameData.running) return
         const { count, bombs } = settlement(cubeList, settlementList)
         // console.log("得分", score);
         if (count > 0) {
@@ -165,13 +180,13 @@ export default function Tetris() {
                 gameData.clearBombTimer = undefined
                 clearTimeout(gameData.clearBombTimer)
             }
-            
+
             setBombList([...bombs])
             setCubeList([...cubeList])
-            
+
             gameData.clearBombTimer = setTimeout(() => {
                 gameData.clearBombTimer = undefined
-                moveCubeList(bombs) 
+                moveCubeList(bombs)
             }, 800);
         } else {
             setTimeout(() => {
@@ -194,20 +209,35 @@ export default function Tetris() {
     }, [])
 
     const turnCurrentPieces = useCallback((turnType) => {
-        const pieces = turnChess(turnType, gameData.currentPieces, cubeList)
+        const pieces = turnChess(gameData.directionData[gameData.direction][turnType], gameData.currentPieces, cubeList)
         updateCurrentPieces(pieces)
     }, [])
 
     const moveCurrentPieces = useCallback((moveType) => {
-        const pieces = moveChess(moveType, gameData.currentPieces, cubeList)
+        const pieces = moveChess(gameData.directionData[gameData.direction][moveType], gameData.currentPieces, cubeList)
         updateCurrentPieces(pieces)
+    }, [])
+
+    const turnCamera = useCallback((left) => {
+        gameData.direction = (gameData.direction + (left ? -1 : 1)) % 4
+        tetrisRef.current.rotation.y = -Math.PI * gameData.direction * 0.5
     }, [])
 
 
     const handleKeyDown = (event) => {
         // console.log(event.keyCode);
-        
-        if (eventData[event.keyCode]) {
+        if (event.shiftKey) {
+            if (eventData[event.keyCode]) {
+                const { key, action } = eventData[event.keyCode]
+                if (action == 0) {
+                    if (key == 2) {
+                        turnCamera(true)
+                    } else if (key == 3) {
+                        turnCamera(false)
+                    }
+                }
+            }
+        } else if (eventData[event.keyCode]) {
             const { key, action } = eventData[event.keyCode]
             if (action == 3) {
                 if (gameData.running) {
@@ -215,7 +245,7 @@ export default function Tetris() {
                 } else {
                     gameData.running = true
                     gameData.runSpeed = PiecesDownSpeed.normal
-                    if(gameData.state == 2) {
+                    if (gameData.state == 2) {
                         updateScoreAndCubeList()
                     }
                 }
@@ -228,23 +258,24 @@ export default function Tetris() {
                 moveCurrentPieces(key)
             } else if (action == 2) {
                 gameData.runSpeed = PiecesDownSpeed.fastest
-            } 
+            }
         }
     };
 
-    // const handleKeyUp = (event) => {
-    //     if (gameData.state != 1) return
-    //     if (event.keyCode == 32) {
-    //         gameData.runSpeed = PiecesDownSpeed.normal
-    //     }
-    // };
+    const handleKeyUp = (event) => {
+        // console.log(event.keyCode);
+        if (gameData.state != 1) return
+        if (event.keyCode == 13) {
+            gameData.runSpeed = PiecesDownSpeed.normal
+        }
+    };
 
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
-        // document.addEventListener('keyup', handleKeyUp);
+        document.addEventListener('keyup', handleKeyUp);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            // document.removeEventListener('keyup', handleKeyUp);
+            document.removeEventListener('keyup', handleKeyUp);
         };
     }, [])
 
@@ -259,76 +290,77 @@ export default function Tetris() {
     })
 
     return (
-        <>
-            <group position={[0, -height * 0.5, 0]} rotation-y={Math.PI * 0} rotation-x={0}>
-                <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
-                    {
-                        cubeList.map((floor, x) => {
-                            return floor.map((row, y) => {
-                                return row.map((item, z) => {
-                                    if (item && item.valid) {
-                                        return (
-                                            <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${x}-${y}-${z}`} args={[1, 1, 1]} position={[x, y, z]} receiveShadow>
-                                                <meshStandardMaterial color={item.color} />
-                                            </RoundedBox>
-                                        )
-                                    }
-                                });
-                            })
-                        }).flat().flat().filter(item => item !== undefined)
-                    }
-                    {
-                        currentCube.positions.map(p => {
-                            return (
-                                <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
-                                    <meshStandardMaterial color={currentCube.color} />
-                                </RoundedBox>
-                            )
+        <group ref={tetrisRef} position={[0, -height * 0.5, 0]} rotation-x={0}>
+            <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
+                {
+                    cubeList.map((floor, x) => {
+                        return floor.map((row, y) => {
+                            return row.map((item, z) => {
+                                if (item && item.valid) {
+                                    return (
+                                        <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${x}-${y}-${z}`} args={[1, 1, 1]} position={[x, y, z]} receiveShadow>
+                                            <meshStandardMaterial color={item.color} />
+                                        </RoundedBox>
+                                    )
+                                }
+                            });
                         })
-                    }
-                    {
-                        nextCube.positions.map(p => {
-                            return (
-                                <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p}>
-                                    <meshStandardMaterial color={nextCube.color} />
-                                </RoundedBox>
-                            )
-                        })
-                    }
-                </group>
-                <group>
-                    <Plane args={[cols, rows]} receiveShadow rotation-x={-Math.PI * 0.5} position-y={0.11} >
-                        <shadowMaterial opacity={0.7} />
-                    </Plane>
-                    <Box args={[cols, 0.2, rows]} >
-                        <customShaderMaterial uCols={cols} uRows={rows} />
-                    </Box>
-
-                    <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
-                        <meshBasicMaterial color="#f00000" side={DoubleSide} transparent opacity={0.2} />
-                    </Plane>
-                    <Plane args={[cols + 0.2, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
-                        <meshBasicMaterial color="#00f000" side={DoubleSide} transparent opacity={0.2} />
-                    </Plane>
-                    <Plane args={[cols, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>
-                        <meshBasicMaterial color="#ffffff" side={DoubleSide} transparent opacity={0.1} />
-                    </Plane>
-                    <Plane args={[rows, height + 0.3]} position-y={height * 0.5} position-x={-cols * 0.51} rotation-y={Math.PI * 0.5}>
-                        <meshBasicMaterial color="#0000f0" side={DoubleSide} transparent opacity={0.2} />
-                    </Plane>
-                    <Plane args={[rows, height + 0.3]} position-y={height * 0.5} position-x={cols * 0.51} rotation-y={Math.PI * 0.5}>
-                        <meshBasicMaterial color="#00f0f0" side={DoubleSide} transparent opacity={0.1} />
-                    </Plane>
-                </group>
-                <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
-                    {
-                        bombList.map(({ position, color }) => {
-                            return <Bomb key={`${position[0]}-${position[1]}-${position[2]}`} position={position} color={color} />
-                        }
+                    }).flat().flat().filter(item => item !== undefined)
+                }
+                {
+                    currentCube.positions.map(p => {
+                        return (
+                            <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p} castShadow>
+                                <meshStandardMaterial color={currentCube.color} />
+                            </RoundedBox>
                         )
-                    } 
+                    })
+                }
+                {
+                    nextCube.positions.map(p => {
+                        return (
+                            <RoundedBox radius={0.1} creaseAngle={1.0} smoothness={1} bevelSegments={1} key={`${p[0]}-${p[1]}-${p[2]}`} args={[1, 1, 1]} position={p}>
+                                <meshStandardMaterial color={nextCube.color} />
+                            </RoundedBox>
+                        )
+                    })
+                }
+            </group>
+            <group>
+                {/* 阴影 */}
+                <Plane args={[cols, rows]} receiveShadow rotation-x={-Math.PI * 0.5} position-y={0.11} >
+                    <shadowMaterial opacity={0.7} />
+                </Plane>
+                {/* 底 */}
+                <Box args={[cols, 0.2, rows]} >
+                    <customShaderMaterial uCols={cols} uRows={rows} />
+                </Box>
 
-                    {/* <Bomb position={[0, 0, 8]} color="#00ff00" />
+                <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
+                    <meshBasicMaterial color="#c3c08a" side={DoubleSide} transparent opacity={0.4} />
+                </Plane>
+                <Plane args={[cols + 0.1, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
+                    <meshBasicMaterial color="#fff" side={DoubleSide} transparent opacity={0.1} />
+                </Plane>
+                <Plane args={[cols + 0.1, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>
+                    <meshBasicMaterial color="#fff" side={DoubleSide} transparent opacity={0.1} />
+                </Plane>
+                <Plane args={[rows + 0.1, height + 0.3]} position-y={height * 0.5} position-x={-cols * 0.51} rotation-y={Math.PI * 0.5}>
+                    <meshBasicMaterial color="#888" side={DoubleSide} transparent opacity={0.1} />
+                </Plane>
+                <Plane args={[rows + 0.1, height + 0.3]} position-y={height * 0.5} position-x={cols * 0.51} rotation-y={Math.PI * 0.5}>
+                    <meshBasicMaterial color="#888" side={DoubleSide} transparent opacity={0.1} />
+                </Plane>
+            </group>
+            <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
+                {
+                    bombList.map(({ position, color }) => {
+                        return <Bomb key={`${position[0]}-${position[1]}-${position[2]}`} position={position} color={color} />
+                    }
+                    )
+                }
+
+                {/* <Bomb position={[0, 0, 8]} color="#00ff00" />
                     <Bomb position={[1, 0, 8]} color="#00ff00" />
                     <Bomb position={[2, 0, 8]} color="#00ff00" />
                     <Bomb position={[3, 0, 8]} color="#00ff00" />
@@ -338,9 +370,8 @@ export default function Tetris() {
                     <Bomb position={[7, 0, 8]} color="#00ff00" />
                     <Bomb position={[8, 0, 8]} color="#00ff00" />
                     <Bomb position={[9, 0, 8]} color="#00ff00" /> */}
-                </group>
             </group>
-        </>
+        </group>
     )
 }
 

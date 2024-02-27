@@ -230,13 +230,22 @@ const eventData = {
 // }
 
 const initTypesData = [
-    { type: 0, color: "#ff0000" }, //:.
-    { type: 12, color: "#00ff00" }, //::
-    { type: 24, color: "#0000ff" }, //....
-    { type: 30, color: "#f0f000" }, //.:.
-    { type: 42, color: "#f000f0" }, //:..
-    { type: 66, color: "#00f0f0" }, //.:•
+    { type: 1, color: "#efbeb7" }, //:.
+    { type: 12, color: "#393e8f" }, //::
+    { type: 24, color: "#f7235b" }, //....
+    { type: 30, color: "#169873" }, //.:.
+    { type: 42, color: "#f3cc64" }, //:..
+    { type: 66, color: "#07b6da" }, //.:•
 ]
+
+// const initTypesData = [
+//     { type: 0, color: "#b4a7d6" }, //:.
+//     { type: 12, color: "#e7e3fc" }, //::
+//     { type: 24, color: "#8f80bd" }, //....
+//     { type: 30, color: "#d690af" }, //.:.
+//     { type: 42, color: "#efbeb7" }, //:..
+//     { type: 66, color: "#eab2d3" }, //.:•
+// ]
 
 const createPieces = () => {
     const data = initTypesData[Math.floor(Math.random() * initTypesData.length)]
@@ -251,10 +260,26 @@ const chessList = Array.from({ length: cols }, () =>
     Array.from({ length: height + 2 }, () => Array.from({ length: rows }, () => undefined))
 );
 
-// chessList[5][0][5] = true;
-// chessList[5][0][4] = true;
-// chessList[4][0][5] = true;
-// chessList[4][0][4] = true;
+// chessList[0][0][0] = {valid: true, color: initTypesData[0].color};
+// chessList[0][0][1] = {valid: true, color: initTypesData[1].color};
+// chessList[0][0][2] = {valid: true, color: initTypesData[2].color};
+// chessList[0][0][3] = {valid: true, color: initTypesData[3].color};
+// chessList[0][0][4] = {valid: true, color: initTypesData[4].color};
+// chessList[0][0][5] = {valid: true, color: initTypesData[5].color};
+
+// chessList[1][0][0] = {valid: true, color: initTypesData[0+1].color};
+// chessList[1][0][1] = {valid: true, color: initTypesData[1+1].color};
+// chessList[1][0][2] = {valid: true, color: initTypesData[2+1].color};
+// chessList[1][0][3] = {valid: true, color: initTypesData[3+1].color};
+// chessList[1][0][4] = {valid: true, color: initTypesData[4+1].color};
+// chessList[1][0][5] = {valid: true, color: initTypesData[0].color};
+
+// chessList[2][0][0] = {valid: true, color: initTypesData[0+2].color};
+// chessList[2][0][1] = {valid: true, color: initTypesData[1+2].color};
+// chessList[2][0][2] = {valid: true, color: initTypesData[2+2].color};
+// chessList[2][0][3] = {valid: true, color: initTypesData[3+2].color};
+// chessList[2][0][4] = {valid: true, color: initTypesData[0].color};
+// chessList[2][0][5] = {valid: true, color: initTypesData[1].color};
 
 const copyPieces = (pieces) => {
     const newPieces = { ...pieces }
