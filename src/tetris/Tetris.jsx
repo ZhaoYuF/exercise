@@ -107,14 +107,17 @@ export default forwardRef(function Tetris({
     // const [currentCubeTime, setCurrentCubeTime] = useState(0);
 
     const clearCubeList = useCallback(() => {
-        // cubeList.forEach(element => {
-        //     return 
-        // });
+        cubeList.forEach(element => {
+            element.forEach(item => {
+                item = item.map(() => undefined)
+            });
+        });
+        console.log("aaa", cubeList);
         // settlementList.flatMap(item => 0)
         
-        // setCubeList([...cubeList])
-        // setSettlementList(Array.from({ length: height }, () =>
-        // Array.from({ length: rows + cols }, () => 0)))
+        setCubeList([...cubeList])
+        setSettlementList(Array.from({ length: height }, () =>
+        Array.from({ length: rows + cols }, () => 0)))
     }, [])
 
     const updateCurrentCube = useCallback((data) => {
@@ -146,7 +149,6 @@ export default forwardRef(function Tetris({
     }, []);
 
     const downCurrentCube = useCallback(() => {
-        console.log(cubeList);
         const pieces = downPieces(gameData.currentPieces, cubeList)
         if (pieces != gameData.currentPieces) {
             gameData.currentPieces = pieces
