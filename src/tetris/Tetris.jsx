@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
 import { extend, useFrame } from "@react-three/fiber";
 import { DoubleSide } from 'three';
@@ -47,7 +47,9 @@ const PiecesDownSpeed = {
     fastest: 16.0,
 }
 
-export default function Tetris() {
+export default forwardRef(function Tetris({
+    onScore,
+}, ref) {
 
     const [gameData, _] = useState({
         running: false, // 是否运行
@@ -67,6 +69,8 @@ export default function Tetris() {
         ],
         direction: 0, //0, 1, 2, 3: 前右后左
         // canChangePiece: true,
+        score: 0,
+        currentScoreCount: 0,
     })
 
     const tetrisRef = useRef()
@@ -172,6 +176,7 @@ export default function Tetris() {
         const { count, bombs } = settlement(cubeList, settlementList)
         // console.log("得分", score);
         if (count > 0) {
+            gameData.currentScoreCount += count
             // for (const { position } of bombs) {
             //     const [x, y, z] = position
             //     cubeList[x][y][z] = undefined
@@ -189,6 +194,12 @@ export default function Tetris() {
                 moveCubeList(bombs)
             }, 800);
         } else {
+            if(gameData.currentScoreCount > 0) {
+                const score = 2 ** gameData.currentScoreCount - 1
+                gameData.score += score
+                onScore(gameData.score)
+                gameData.currentScoreCount = 0
+            }
             setTimeout(() => {
                 runNextCube()
             }, 500);
@@ -219,7 +230,7 @@ export default function Tetris() {
     }, [])
 
     const turnCamera = useCallback((left) => {
-        gameData.direction = (gameData.direction + (left ? -1 : 1)) % 4
+        gameData.direction = (gameData.direction + (left ? 3 : 1)) % 4
         tetrisRef.current.rotation.y = -Math.PI * gameData.direction * 0.5
     }, [])
 
@@ -288,6 +299,13 @@ export default function Tetris() {
             }
         }
     })
+
+    useImperativeHandle(ref, () => {
+        return {
+            handleKeyDown,
+            handleKeyUp,
+        };
+      }, []);
 
     return (
         <group ref={tetrisRef} position={[0, -height * 0.5, 0]} rotation-x={0}>
@@ -373,6 +391,6 @@ export default function Tetris() {
             </group>
         </group>
     )
-}
+})
 
 
