@@ -10,7 +10,7 @@ export default function Game() {
     const background = "linear-gradient(#485563, #2E1437)"
 
     const [score, setScore] = useState(0)
-
+    const [gameState, setGameState] = useState(0) // 0结束，1运行， 2暂停
     const tetris = useRef()
 
     const tapKeyDown = (event) => {
@@ -25,6 +25,13 @@ export default function Game() {
         if(tetris.current) {
             tetris.current.handleKeyUp(event)
         }
+    }
+
+    const onChangeGameState = (state) => {
+        if(gameState == 0) {
+            setScore(0)
+        }
+        setGameState(state)
     }
 
     return (
@@ -49,10 +56,10 @@ export default function Game() {
                     <directionalLight position={[0, 20, 0]} intensity={1.8} castShadow />
                     <directionalLight position={[5, 5, 10]} intensity={0.5} />
                     <ambientLight intensity={0.8} />
-                    <Tetris onScore={(s) => {setScore(s)}} ref={tetris} />
+                    <Tetris onScore={(s) => {setScore(s)}} ref={tetris} gameState={gameState} onChangeGameState={onChangeGameState} />
                 </group>
             </Canvas>
-            <GameUI score={score} onKeyDown={tapKeyDown} onKeyUp={tapKeyUp} />
+            <GameUI score={score} gameState={gameState} onChangeGameState={onChangeGameState} onKeyDown={tapKeyDown} onKeyUp={tapKeyUp} />
         </div>
     )
 }

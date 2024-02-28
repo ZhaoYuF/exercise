@@ -2,6 +2,8 @@ import React, { useMemo } from 'react'
 
 export default function GameUI({
     score = 0,
+    gameState,
+    onChangeGameState,
     onKeyDown,
     onKeyUp,
 }) {
@@ -81,6 +83,20 @@ export default function GameUI({
                 pointerEvents: 'all',
                 userSelect: 'none',
             },
+
+            start: {
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                font: '44px Comic Sans MS',
+                color: '#f7235b',
+                // backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                // boxShadow: '0 0 4px 4px 4px #fff',
+                padding: '4px 12px',
+                pointerEvents: 'all',
+
+            }
         }
     }, [])
 
@@ -88,7 +104,7 @@ export default function GameUI({
         // console.log(e);
         const keyCode = e.currentTarget.dataset.keycode
         const shiftKey = e.currentTarget.dataset.shiftkey
-        onKeyDown({keyCode, shiftKey})
+        onKeyDown({ keyCode, shiftKey })
     }
 
     //  //action:2 倍速
@@ -129,6 +145,14 @@ export default function GameUI({
             <div style={styleData.right}>
                 <svg viewBox="0 0 1024 1024" width="24" height="40" data-keycode="39" data-shiftkey={true} onClick={onTapButton}><path d="M481.233 904c8.189 0 16.379-3.124 22.628-9.372 12.496-12.497 12.496-32.759 0-45.256L166.488 512l337.373-337.373c12.496-12.497 12.496-32.758 0-45.255-12.498-12.497-32.758-12.497-45.256 0l-360 360c-12.496 12.497-12.496 32.758 0 45.255l360 360c6.249 6.249 14.439 9.373 22.628 9.373z" fill="#2E1437" /></svg>
             </div>
+            {
+                gameState == 0 ?
+                <div style={styleData.start} onClick={() => {onChangeGameState(1)}}>START</div> :
+                gameState == 2 ? 
+                <div style={styleData.start} onClick={() => {onChangeGameState(1)}}>
+                    <svg viewBox="0 0 1024 1024" width="44" height="44"><path d="M256 0 880 512 256 1024Z" fill="#2E1437" /></svg>
+                </div> : null
+            } 
         </div>
     )
 }

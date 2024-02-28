@@ -49,8 +49,9 @@ const PiecesDownSpeed = {
 
 export default forwardRef(function Tetris({
     onScore,
+    gameState,
+    onChangeGameState,
 }, ref) {
-
     const [gameData, _] = useState({
         running: false, // 是否运行
         state: 1, //1下落， 2结算， 0游戏结束
@@ -73,9 +74,29 @@ export default forwardRef(function Tetris({
         currentScoreCount: 0,
     })
 
+    const restartGame = useCallback(() => {
+        gameData.running = true
+        gameData.state = 1
+        gameData.runDuration = 0.0
+        gameData.runSpeed = PiecesDownSpeed.normal
+        gameData.cubeIndex = 0
+        gameData.currentStep = 0
+        gameData.currentPieces = createPieces()
+        gameData.nextPiece = undefined
+        gameData.score = 0
+        gameData.currentScoreCount = 0
+        clearCubeList()
+        setCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
+        setNextCube({ positions: [], color: undefined })
+    }, []);
+
+    gameData.running = gameState == 1 ? true : false
+    if(gameData.state == 0 && gameData.running) {
+        restartGame()
+    }
     const tetrisRef = useRef()
 
-    const [cubeList, setCubeList] = useState(chessList);
+    const [cubeList, setCubeList] = useState(JSON.parse(JSON.stringify(chessList)));
     const [settlementList, setSettlementList] = useState(Array.from({ length: height }, () =>
         Array.from({ length: rows + cols }, () => 0))
     );
@@ -85,8 +106,18 @@ export default forwardRef(function Tetris({
 
     // const [currentCubeTime, setCurrentCubeTime] = useState(0);
 
+    const clearCubeList = useCallback(() => {
+        // cubeList.forEach(element => {
+        //     return 
+        // });
+        // settlementList.flatMap(item => 0)
+        
+        // setCubeList([...cubeList])
+        // setSettlementList(Array.from({ length: height }, () =>
+        // Array.from({ length: rows + cols }, () => 0)))
+    }, [])
+
     const updateCurrentCube = useCallback((data) => {
-        // console.log(data);
         if (data) {
             currentCube.positions = data.positions
             currentCube.color = data.color
@@ -115,6 +146,7 @@ export default forwardRef(function Tetris({
     }, []);
 
     const downCurrentCube = useCallback(() => {
+        console.log(cubeList);
         const pieces = downPieces(gameData.currentPieces, cubeList)
         if (pieces != gameData.currentPieces) {
             gameData.currentPieces = pieces
@@ -133,6 +165,7 @@ export default forwardRef(function Tetris({
                 cubeList[x][y][z] = { valid: true, color: currentCube.color }
                 if (y >= height) {
                     gameData.state = 0
+                    onChangeGameState(0)
                 } else {
                     settlementList[y][x] += 1
                     settlementList[y][cols + z] += 1
@@ -148,7 +181,6 @@ export default forwardRef(function Tetris({
         gameData.currentPieces = gameData.nextPiece || createPieces()
         gameData.nextPiece = undefined
 
-        console.log(gameData.cubeIndex);
         if (PiecesDownSpeed.normal < PiecesDownSpeed.fastest) {
             PiecesDownSpeed.normal = 2 + Math.floor(gameData.cubeIndex / 100) * 0.5
         }
@@ -253,8 +285,10 @@ export default forwardRef(function Tetris({
             if (action == 3) {
                 if (gameData.running) {
                     gameData.running = false
+                    onChangeGameState(2)
                 } else {
                     gameData.running = true
+                    onChangeGameState(1)
                     gameData.runSpeed = PiecesDownSpeed.normal
                     if (gameData.state == 2) {
                         updateScoreAndCubeList()
