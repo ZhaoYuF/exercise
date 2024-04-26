@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Box, Plane, RoundedBox, shaderMaterial } from '@react-three/drei'
-import { extend, useFrame } from "@react-three/fiber";
-import { DoubleSide } from 'three';
+import { extend, useFrame, useThree } from "@react-three/fiber";
+import * as THREE from 'three';
 import { rows, cols, height, chessList, createPieces, cubePositionsWithPieces, turnChess, downPieces, eventData, moveChess, settlement, moveDownCubeList } from './Pieces.js'
 import Bomb from './Bomb.jsx';
+import audioContext from './audio.js'
 
 
 const CustomShaderMaterial = new shaderMaterial(
@@ -51,8 +52,10 @@ export default forwardRef(function Tetris({
     onScore,
     gameState,
     onChangeGameState,
+    disabled,
 }, ref) {
     const [gameData, _] = useState({
+        disabled: false,
         running: false, // 是否运行
         state: 1, //1下落， 2结算， 0游戏结束
         runDuration: 0.0, //
@@ -74,6 +77,8 @@ export default forwardRef(function Tetris({
         currentScoreCount: 0,
     })
 
+    gameData.disabled = disabled
+
     const restartGame = useCallback(() => {
         gameData.running = true
         gameData.state = 1
@@ -91,7 +96,7 @@ export default forwardRef(function Tetris({
     }, []);
 
     gameData.running = gameState == 1 ? true : false
-    if(gameData.state == 0 && gameData.running) {
+    if (gameData.state == 0 && gameData.running) {
         restartGame()
     }
     const tetrisRef = useRef()
@@ -104,20 +109,24 @@ export default forwardRef(function Tetris({
     const [currentCube, setCurrentCube] = useState(cubePositionsWithPieces(gameData.currentPieces));
     const [nextCube, setNextCube] = useState({ positions: [], color: undefined });
 
-    // const [currentCubeTime, setCurrentCubeTime] = useState(0);
 
     const clearCubeList = useCallback(() => {
-        cubeList.forEach(element => {
-            element.forEach(item => {
-                item = item.map(() => undefined)
-            });
-        });
-        console.log("aaa", cubeList);
-        // settlementList.flatMap(item => 0)
-        
+        for (let x = 0; x < cubeList.length; x++) {
+            for (let y = 0; y < cubeList[0].length; y++) {
+                for (let z = 0; z < cubeList[0][0].length; z++) {
+                    if (cubeList[x][y][z]) {
+                        cubeList[x][y][z] = undefined
+                    }
+                }
+            }
+        }
+        for (let i = 0; i < settlementList.length; i++) {
+            for (let j = 0; j < settlementList[0].length; j++) {
+                settlementList[i][j] = 0
+            }
+        }
+
         setCubeList([...cubeList])
-        setSettlementList(Array.from({ length: height }, () =>
-        Array.from({ length: rows + cols }, () => 0)))
     }, [])
 
     const updateCurrentCube = useCallback((data) => {
@@ -151,12 +160,14 @@ export default forwardRef(function Tetris({
     const downCurrentCube = useCallback(() => {
         const pieces = downPieces(gameData.currentPieces, cubeList)
         if (pieces != gameData.currentPieces) {
+            // audioContext.playMoveMusic()
             gameData.currentPieces = pieces
             updateCurrentCube(cubePositionsWithPieces(gameData.currentPieces))
             if (gameData.nextPiece == undefined && pieces.position[1] < height) {
                 createNextCube()
             }
         } else {
+            audioContext.playFailMusic()
             finishedCurrentCube()
         }
     }, [])
@@ -210,6 +221,7 @@ export default forwardRef(function Tetris({
         const { count, bombs } = settlement(cubeList, settlementList)
         // console.log("得分", score);
         if (count > 0) {
+            audioContext.playScoreMusic()
             gameData.currentScoreCount += count
             // for (const { position } of bombs) {
             //     const [x, y, z] = position
@@ -228,7 +240,7 @@ export default forwardRef(function Tetris({
                 moveCubeList(bombs)
             }, 800);
         } else {
-            if(gameData.currentScoreCount > 0) {
+            if (gameData.currentScoreCount > 0) {
                 const score = 2 ** gameData.currentScoreCount - 1
                 gameData.score += score
                 onScore(gameData.score)
@@ -253,14 +265,26 @@ export default forwardRef(function Tetris({
         }
     }, [])
 
+    //旋转
     const turnCurrentPieces = useCallback((turnType) => {
+        
         const pieces = turnChess(gameData.directionData[gameData.direction][turnType], gameData.currentPieces, cubeList)
-        updateCurrentPieces(pieces)
+        if (pieces != gameData.currentPieces) {
+            audioContext.playRotationMusic()
+            updateCurrentPieces(pieces)
+        } else {
+            audioContext.playFailMusic()
+        }
     }, [])
 
     const moveCurrentPieces = useCallback((moveType) => {
         const pieces = moveChess(gameData.directionData[gameData.direction][moveType], gameData.currentPieces, cubeList)
-        updateCurrentPieces(pieces)
+        if (pieces != gameData.currentPieces) {
+            audioContext.playMoveMusic()
+            updateCurrentPieces(pieces)
+        } else {
+            audioContext.playFailMusic()
+        }
     }, [])
 
     const turnCamera = useCallback((left) => {
@@ -270,7 +294,12 @@ export default forwardRef(function Tetris({
 
 
     const handleKeyDown = (event) => {
-        // console.log(event.keyCode);
+        if (event.preventDefault) {
+            event.preventDefault()
+        }
+        // 
+        if (gameData.disabled) { return }
+        console.log(event.keyCode);
         if (event.shiftKey) {
             if (eventData[event.keyCode]) {
                 const { key, action } = eventData[event.keyCode]
@@ -310,29 +339,49 @@ export default forwardRef(function Tetris({
     };
 
     const handleKeyUp = (event) => {
-        // console.log(event.keyCode);
         if (gameData.state != 1) return
         if (event.keyCode == 13) {
             gameData.runSpeed = PiecesDownSpeed.normal
         }
     };
 
+
+
+
+    // const onResumeScroll = () => {
+    //     console.log(resume.scrollTop);
+    //     console.log(camera);
+
+    // }
+
     useEffect(() => {
         document.addEventListener('keydown', handleKeyDown);
         document.addEventListener('keyup', handleKeyUp);
+        // resume.addEventListener('scroll', onResumeScroll);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.removeEventListener('keyup', handleKeyUp);
+            // resume.removeEventListener('scroll', onResumeScroll);
         };
     }, [])
 
+    const resume = document.querySelector("#resume")
+
     useFrame((state, delta) => {
+        // console.log(disabled);
         if (gameData.state == 1 && gameData.running) {
             gameData.runDuration += delta * gameData.runSpeed
             if (gameData.runDuration >= gameData.currentStep + 1) {
                 gameData.currentStep += 1
                 downCurrentCube()
             }
+        }
+        if (gameData.disabled) {
+            const scrollTop = Math.max(0, resume.scrollTop - 50);
+            const angle = scrollTop / 360.0 * Math.PI
+            const radius = 20 + Math.atan(scrollTop * 0.004) * 20
+            state.camera.position.set(Math.sin(angle) * radius, -2, Math.cos(angle) * radius)
+            state.camera.lookAt(new THREE.Vector3(0, 0, 0))
         }
     })
 
@@ -341,10 +390,10 @@ export default forwardRef(function Tetris({
             handleKeyDown,
             handleKeyUp,
         };
-      }, []);
+    }, []);
 
     return (
-        <group ref={tetrisRef} position={[0, -height * 0.5, 0]} rotation-x={0}>
+        <group ref={tetrisRef} rotation-x={0} position={[0, -height * 0.5 + 1, 0]}>
             <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>
                 {
                     cubeList.map((floor, x) => {
@@ -391,19 +440,19 @@ export default forwardRef(function Tetris({
                 </Box>
 
                 <Plane args={[cols + 0.2, rows + 0.2]} position-y={height + 0.11} rotation-x={Math.PI * 0.5}>
-                    <meshBasicMaterial color="#c3c08a" side={DoubleSide} transparent opacity={0.4} />
+                    <meshBasicMaterial color="#c3c08a" side={THREE.DoubleSide} transparent opacity={0.4} />
                 </Plane>
                 <Plane args={[cols + 0.1, height + 0.3]} position-y={height * 0.5} position-z={-rows * 0.51}>
-                    <meshBasicMaterial color="#fff" side={DoubleSide} transparent opacity={0.1} />
+                    <meshBasicMaterial color="#fff" side={THREE.DoubleSide} transparent opacity={0.1} />
                 </Plane>
                 <Plane args={[cols + 0.1, height + 0.3]} position-y={height * 0.5} position-z={rows * 0.51}>
-                    <meshBasicMaterial color="#fff" side={DoubleSide} transparent opacity={0.1} />
+                    <meshBasicMaterial color="#fff" side={THREE.DoubleSide} transparent opacity={0.1} />
                 </Plane>
                 <Plane args={[rows + 0.1, height + 0.3]} position-y={height * 0.5} position-x={-cols * 0.51} rotation-y={Math.PI * 0.5}>
-                    <meshBasicMaterial color="#888" side={DoubleSide} transparent opacity={0.1} />
+                    <meshBasicMaterial color="#888" side={THREE.DoubleSide} transparent opacity={0.1} />
                 </Plane>
                 <Plane args={[rows + 0.1, height + 0.3]} position-y={height * 0.5} position-x={cols * 0.51} rotation-y={Math.PI * 0.5}>
-                    <meshBasicMaterial color="#888" side={DoubleSide} transparent opacity={0.1} />
+                    <meshBasicMaterial color="#888" side={THREE.DoubleSide} transparent opacity={0.1} />
                 </Plane>
             </group>
             <group position={[- cols * 0.5 + 0.5, 0.6, - rows * 0.5 + 0.5]}>

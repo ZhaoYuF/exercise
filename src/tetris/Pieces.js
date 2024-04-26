@@ -229,14 +229,27 @@ const eventData = {
 //     type: 1
 // }
 
+// const initTypesData = [
+//     { type: 1, color: "#efbeb7" }, //:.
+//     { type: 12, color: "#393e8f" }, //::
+//     { type: 24, color: "#f7235b" }, //....
+//     { type: 30, color: "#169873" }, //.:.
+//     { type: 42, color: "#f3cc64" }, //:..
+//     { type: 66, color: "#07b6da" }, //.:•
+// ]
+
 const initTypesData = [
-    { type: 1, color: "#efbeb7" }, //:.
-    { type: 12, color: "#393e8f" }, //::
-    { type: 24, color: "#f7235b" }, //....
-    { type: 30, color: "#169873" }, //.:.
-    { type: 42, color: "#f3cc64" }, //:..
-    { type: 66, color: "#07b6da" }, //.:•
+    { type: [1, 3, 6, 8], color: "#efbeb7" },
+    { type: [13, 15, 19, 21], color: "#393e8f" },
+    { type: [24, 25, 27], color: "#f7235b" }, //....
+    { type: [30, 41], color: "#169873" }, //.:.
+    { type: [42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65], color: "#f3cc64" }, //:..
+    { type: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89], color: "#07b6da" }, //.:•
 ]
+
+// const initTypesData = [
+//     { type: [66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89], color: "#efbeb7" }
+// ]
 
 // const initTypesData = [
 //     { type: 0, color: "#b4a7d6" }, //:.
@@ -249,9 +262,14 @@ const initTypesData = [
 
 const createPieces = () => {
     const data = initTypesData[Math.floor(Math.random() * initTypesData.length)]
-    const position = [data.type == 24 ? 3 : 4, height + 2, 5]
+    
+    // const position = [data.type == 24 ? 3 : 4, height + 2, 5]
+    const x = Math.floor(Math.random() * 4) + 3
+    const z = Math.floor(Math.random() * 4) + 3
+    const position = [x, height + 2, z]
     return {
-        ...data,
+        type: data.type[Math.floor(Math.random() * data.type.length)],
+        color: data.color,
         position
     }
 }
